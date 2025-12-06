@@ -2,6 +2,8 @@
 
 MQTop is a lightweight Python CLI tool for developers and SREs working with RabbitMQ, especially in Kubernetes environments. It provides a `top`-like live view of queues and can automatically manage `kubectl port-forward` for RabbitMQ running inside a cluster.
 
+![MQTop TUI](doc/img.png)
+
 ## Installation (development)
 
 ```bash

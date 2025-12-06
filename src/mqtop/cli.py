@@ -27,9 +27,9 @@ from .monitor import run_top
 
 app = typer.Typer(help="MQTop – RabbitMQ top + Kubernetes port-forward helper.")
 
-k8s_app = typer.Typer(help="Komendy związane z Kubernetesem.")
-forward_app = typer.Typer(help="Zarządzanie port-forwardingiem do RabbitMQ.")
-providers_app = typer.Typer(help="Zarządzanie providerami RabbitMQ.")
+k8s_app = typer.Typer(help="Kubernetes-related commands.")
+forward_app = typer.Typer(help="Manage port-forwarding to RabbitMQ.")
+providers_app = typer.Typer(help="Manage RabbitMQ providers from config.")
 msg_app = typer.Typer(help="Queue/message tools.")
 
 
@@ -52,19 +52,19 @@ def top(
         1.0,
         "--refresh",
         "-r",
-        help="Interwał odświeżania widoku w sekundach.",
+        help="Refresh interval in seconds.",
     ),
     pattern: Optional[str] = typer.Option(
         None,
         "--pattern",
         "-p",
-        help='Filtr nazw kolejek, np. "payments.*".',
+        help='Optional queue name pattern, e.g. "payments.*".',
     ),
     provider: str = typer.Option(
         "dev-k8s",
         "--provider",
         "-P",
-        help="Nazwa providera z configu TOML (sekcja [providers.<name>]).",
+        help="Provider name from TOML config (section [providers.<name>]).",
     ),
 ) -> None:
     """Basic `top` mode – live view of RabbitMQ queues."""
@@ -72,10 +72,10 @@ def top(
     selected: ProviderConfig | None = providers.get(provider)
 
     if selected is None:
-        available = ", ".join(sorted(providers.keys())) or "(brak)"
+        available = ", ".join(sorted(providers.keys())) or "(none)"
         typer.echo(
-            f"Provider '{provider}' nie istnieje w konfiguracji. "
-            f"Dostępni providerzy: {available}"
+            f"Provider '{provider}' not found in config. "
+            f"Available providers: {available}"
         )
         raise typer.Exit(code=1)
 
@@ -83,13 +83,13 @@ def top(
 
     if fs is not None:
         typer.echo(
-            "Port-forward dla providera K8s:\n"
+            "Port-forward for K8s provider:\n"
             f"  provider={fs.provider_name}\n"
             f"  pid={fs.pid}\n"
             f"  command={' '.join(fs.command)}\n"
         )
     else:
-        typer.echo("Brak K8s – używam połączenia bezpośredniego (direct).\n")
+        typer.echo("No K8s provider – using direct connection.\n")
 
     # Hand off to the Rich-based `top` implementation.
     run_top(selected, refresh=refresh, pattern=pattern)
@@ -99,23 +99,23 @@ def top(
 def k8s_forward_start(
     provider: str = typer.Argument(
         "dev-k8s",
-        help="Nazwa providera typu 'k8s' z configu TOML.",
+        help="Name of provider of type 'k8s' from TOML config.",
     ),
 ) -> None:
     """Manually starts port-forward for the given provider."""
     providers = _load_providers_or_exit()
     selected = providers.get(provider)
     if selected is None:
-        available = ", ".join(sorted(providers.keys())) or "(brak)"
+        available = ", ".join(sorted(providers.keys())) or "(none)"
         typer.echo(
-            f"Provider '{provider}' nie istnieje w konfiguracji. "
-            f"Dostępni providerzy: {available}"
+            f"Provider '{provider}' not found in config. "
+            f"Available providers: {available}"
         )
         raise typer.Exit(code=1)
 
     fs = start_forward(selected)
     if fs is None:
-        typer.echo("Provider nie jest typu 'k8s' – nic do forwardowania.")
+        typer.echo("Provider is not of type 'k8s' – nothing to forward.")
         raise typer.Exit(code=0)
 
     typer.echo(
@@ -130,26 +130,26 @@ def k8s_forward_start(
 def k8s_forward_stop(
     provider: str = typer.Argument(
         "dev-k8s",
-        help="Nazwa providera typu 'k8s' z configu TOML.",
+        help="Name of provider of type 'k8s' from TOML config.",
     ),
 ) -> None:
     """Stops port-forward for the given provider."""
     providers = _load_providers_or_exit()
     selected = providers.get(provider)
     if selected is None:
-        available = ", ".join(sorted(providers.keys())) or "(brak)"
+        available = ", ".join(sorted(providers.keys())) or "(none)"
         typer.echo(
-            f"Provider '{provider}' nie istnieje w konfiguracji. "
-            f"Dostępni providerzy: {available}"
+            f"Provider '{provider}' not found in config. "
+            f"Available providers: {available}"
         )
         raise typer.Exit(code=1)
 
     stopped = stop_forward(selected)
     if stopped:
-        typer.echo(f"Zatrzymano port-forward dla providera '{provider}'.")
+        typer.echo(f"Stopped port-forward for provider '{provider}'.")
     else:
         typer.echo(
-            f"Nie znaleziono aktywnego port-forwardu dla providera '{provider}'."
+            f"No active port-forward found for provider '{provider}'."
         )
 
 
@@ -157,26 +157,26 @@ def k8s_forward_stop(
 def k8s_forward_status(
     provider: str = typer.Argument(
         "dev-k8s",
-        help="Nazwa providera typu 'k8s' z configu TOML.",
+        help="Name of provider of type 'k8s' from TOML config.",
     ),
 ) -> None:
     """Shows port-forward status for the given provider."""
     providers = _load_providers_or_exit()
     selected = providers.get(provider)
     if selected is None:
-        available = ", ".join(sorted(providers.keys())) or "(brak)"
+        available = ", ".join(sorted(providers.keys())) or "(none)"
         typer.echo(
-            f"Provider '{provider}' nie istnieje w konfiguracji. "
-            f"Dostępni providerzy: {available}"
+            f"Provider '{provider}' not found in config. "
+            f"Available providers: {available}"
         )
         raise typer.Exit(code=1)
 
     fs = forward_status(selected)
     if fs is None:
-        typer.echo(f"Brak aktywnego port-forwardu dla providera '{provider}'.")
+        typer.echo(f"No active port-forward for provider '{provider}'.")
     else:
         typer.echo(
-            "Port-forward działa:\n"
+            "Port-forward is running:\n"
             f"  provider={fs.provider_name}\n"
             f"  pid={fs.pid}\n"
             f"  command={' '.join(fs.command)}"
@@ -265,13 +265,13 @@ def main_callback(
         "dev-k8s",
         "--provider",
         "-P",
-        help="Nazwa providera z configu TOML (sekcja [providers.<name>]).",
+        help="Provider name from TOML config (section [providers.<name>]).",
     ),
     refresh: float = typer.Option(
         1.0,
         "--refresh",
         "-r",
-        help="Interwał odświeżania widoku w sekundach.",
+        help="Refresh interval in seconds.",
     ),
 ) -> None:
     """When called without subcommand, run `top` by default."""
