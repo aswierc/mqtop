@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "mqtop"
 version = "0.1.0"
 description = "Terminalowe narzędzie CLI do monitorowania RabbitMQ i port-forwardingu na Kubernetesie."
-readme = "PROJECT_REQUIREMENTS.md"
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
