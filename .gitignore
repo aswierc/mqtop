@@ -1,0 +1,20 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Packaging / metadata
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# IDE / editor
+.idea/
+.vscode/
+
+# Local MQTop runtime data (lives in home, but keep pattern here)
+.mqtop/
+
+AGENTS.md
+PROJECT_REQUIREMENTS.md

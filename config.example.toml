@@ -1,0 +1,21 @@
+[providers.dev-local]
+type = "direct"
+host = "localhost"
+amqp_port = 5672
+management_port = 15672
+username = "guest"
+password = "guest"
+vhost = "/"
+
+[providers.dev-k8s]
+type = "k8s"
+context = "dev"
+namespace = "messaging"
+service = "rabbitmq"
+remote_amqp_port = 5672
+local_amqp_port = 5673
+local_ui_port = 15672
+username = "guest"
+password = "guest"
+vhost = "/"
+

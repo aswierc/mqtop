@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mqtop"
+version = "0.1.0"
+description = "Terminalowe narzędzie CLI do monitorowania RabbitMQ i port-forwardingu na Kubernetesie."
+readme = "PROJECT_REQUIREMENTS.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Artur Świerc" }
+]
+dependencies = [
+  "typer[all]>=0.12",
+  "rich>=13.0.0",
+  "requests>=2.31.0",
+  "toml>=0.10.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "ruff>=0.6.0",
+  "mypy>=1.10.0",
+]
+
+[project.scripts]
+mqtop = "mqtop.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
