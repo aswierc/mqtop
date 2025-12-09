@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mqtop"
 version = "0.1.0"
-description = "Terminalowe narzędzie CLI do monitorowania RabbitMQ i port-forwardingu na Kubernetesie."
+description = "CLI top-like viewer for RabbitMQ queues with optional Kubernetes port-forwarding."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -19,6 +19,9 @@ dependencies = [
   "toml>=0.10.2",
   "textual>=0.55.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/aswierc/mqtop"
 
 [project.optional-dependencies]
 dev = [
