@@ -39,11 +39,6 @@ class MQTopApp(App):
         layout: vertical;
     }
 
-    #status {
-        height: 1;
-        padding: 0 1;
-    }
-
     #body {
         height: 1fr;
     }
@@ -75,14 +70,12 @@ class MQTopApp(App):
         self._interval_started = False
 
     def compose(self) -> ComposeResult:
-        yield Static(id="status")
         yield Static(id="body")
         yield Footer()
 
     def on_mount(self) -> None:
         # Activate initial provider (port-forward + health-check) and start loop.
         self._activate_provider(self._provider_name, initial=True)
-        self._update_status()
 
     def _refresh_view(self) -> None:
         """Fetch queues and update the Rich view inside Textual."""
@@ -95,7 +88,10 @@ class MQTopApp(App):
         self._update_deltas(queues)
 
         table = _build_table(self._provider, queues)
-        spinner = _build_spinner(self._step)
+
+        profile_info = f"{self._provider_name} ({self._provider.type})"
+        status_text = f"{profile_info} | {self._connection_status}"
+        spinner = _build_spinner(self._step, text=status_text)
         self._step += 1
 
         body = self.query_one("#body", Static)
@@ -111,14 +107,6 @@ class MQTopApp(App):
             q.publish_total = max(0, q.publish_total - base_pub)
             q.deliver_total = max(0, q.deliver_total - base_del)
 
-    def _update_status(self) -> None:
-        """Render current profile and connection status."""
-        status_widget = self.query_one("#status", Static)
-        provider = self._provider
-        profile_info = f"profile: {self._provider_name} ({provider.type})"
-        text = f"[bold orange3]MQTop[/bold orange3] – {profile_info} | {self._connection_status}"
-        status_widget.update(text)
-
     def _activate_provider(self, name: str, initial: bool = False) -> None:
         """Switch or activate provider, including port-forward and health-check.
 
@@ -126,8 +114,7 @@ class MQTopApp(App):
         """
         provider = self._providers.get(name)
         if provider is None:
-            self._connection_status = f"[red]Unknown provider: {name}[/red]"
-            self._update_status()
+            self._connection_status = f"Unknown provider: {name}"
             return
 
         try:
@@ -143,8 +130,7 @@ class MQTopApp(App):
             # Health-check will raise MQTopError on failure.
             check_management_health(provider)
         except MQTopError as exc:
-            self._connection_status = f"[red]Profile {name}[/red] – {exc}"
-            self._update_status()
+            self._connection_status = f"ERROR for {name}: {exc}"
             return
 
         # Successful activation – update current provider and UI state.
@@ -153,10 +139,7 @@ class MQTopApp(App):
         self._baselines.clear()
         self._step = 0
         self.title = f"MQTop – {provider.name} ({provider.type})"
-        self._connection_status = (
-            f"[green]Profile {name} ({provider.type})[/green] – {status_suffix}"
-        )
-        self._update_status()
+        self._connection_status = status_suffix
 
         if initial and not self._interval_started:
             # Start periodic refresh loop only once.

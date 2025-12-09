@@ -141,11 +141,19 @@ def check_management_health(provider: ProviderConfig) -> None:
 _SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
 
-def _build_spinner(step: int) -> Panel:
-    """Simple spinner so the user sees the screen is alive."""
+def _build_spinner(step: int, text: Optional[str] = None) -> Panel:
+    """Simple spinner panel so the user sees the screen is alive.
+
+    `text` can be used by callers to display profile / status information
+    inside the panel. If omitted, only the spinner is shown.
+    """
     frame = _SPINNER_FRAMES[step % len(_SPINNER_FRAMES)]
+    if text:
+        content = f"[orange3]{frame}[/orange3] {text}"
+    else:
+        content = f"[orange3]{frame}[/orange3]"
     return Panel(
-        f"[orange3]{frame}[/orange3] working...",
+        content,
         title="[bold orange3]MQTop[/bold orange3]",
         border_style="orange3",
         padding=(0, 2),
@@ -244,7 +252,8 @@ def run_top(
                 table = _build_table(provider, queues)
                 spinner = _build_spinner(step)
                 live.update(Group(spinner, table))
-                step += 1
+                # Spin a bit faster visually by advancing more than one frame.
+                step += 2
                 time.sleep(refresh)
     except KeyboardInterrupt:
         console.print("\n[bold]Interrupted (Ctrl+C).[/bold]")
