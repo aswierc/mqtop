@@ -17,14 +17,8 @@ from rich.table import Table
 
 from .config import ProviderConfig, load_providers
 from .errors import MQTopError
-from .k8s import (
-    ensure_forward_for_provider,
-    forward_status,
-    start_forward,
-    stop_forward,
-)
+from .k8s import forward_status, start_forward, stop_forward
 from .messages import peek_messages, print_peeked_messages
-from .monitor import check_management_health
 from .tui import MQTopApp
 
 app = typer.Typer(help="MQTop – RabbitMQ top + Kubernetes port-forward helper.")
@@ -48,28 +42,17 @@ def _load_providers_or_exit() -> dict[str, ProviderConfig]:
         raise typer.Exit(code=1)
 
 
-def _run_textual_top(selected: ProviderConfig, refresh: float) -> None:
-    """Shared helper to run the Textual-based top for a provider."""
-    fs = ensure_forward_for_provider(selected)
+def _run_textual_top(
+    providers: dict[str, ProviderConfig],
+    provider_name: str,
+    refresh: float,
+) -> None:
+    """Shared helper to run the Textual-based top for a provider.
 
-    if fs is not None:
-        typer.echo(
-            "Port-forward for K8s provider:\n"
-            f"  provider={fs.provider_name}\n"
-            f"  pid={fs.pid}\n"
-            f"  command={' '.join(fs.command)}\n"
-        )
-    else:
-        typer.echo("No K8s provider – using direct connection.\n")
-
-    # Perform a quick health-check so we fail fast on connection issues.
-    try:
-        check_management_health(selected)
-    except MQTopError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(code=1)
-
-    app_ui = MQTopApp(provider=selected, refresh=refresh)
+    The Textual app itself handles port-forward and health-check,
+    and supports switching providers via keyboard shortcuts.
+    """
+    app_ui = MQTopApp(providers=providers, initial_provider=provider_name, refresh=refresh)
     try:
         app_ui.run()
     except MQTopError as exc:
@@ -100,9 +83,7 @@ def top(
 ) -> None:
     """Top mode – live view of RabbitMQ queues in a Textual TUI."""
     providers = _load_providers_or_exit()
-    selected: ProviderConfig | None = providers.get(provider)
-
-    if selected is None:
+    if provider not in providers:
         available = ", ".join(sorted(providers.keys())) or "(none)"
         typer.echo(
             f"Provider '{provider}' not found in config. "
@@ -111,7 +92,7 @@ def top(
         raise typer.Exit(code=1)
 
     # For now we ignore pattern and reuse the Textual-based top.
-    _run_textual_top(selected, refresh=refresh)
+    _run_textual_top(providers, provider_name=provider, refresh=refresh)
 
 
 @forward_app.command("start")
@@ -302,8 +283,7 @@ def main_callback(
         return
 
     providers = _load_providers_or_exit()
-    selected: ProviderConfig | None = providers.get(provider)
-    if selected is None:
+    if provider not in providers:
         available = ", ".join(sorted(providers.keys())) or "(none)"
         typer.echo(
             f"Provider '{provider}' not found in config. "
@@ -311,7 +291,7 @@ def main_callback(
         )
         raise typer.Exit(code=1)
 
-    _run_textual_top(selected, refresh=refresh)
+    _run_textual_top(providers, provider_name=provider, refresh=refresh)
 
 
 def main() -> None:
