@@ -24,7 +24,8 @@ from .k8s import (
     stop_forward,
 )
 from .messages import peek_messages, print_peeked_messages
-from .monitor import check_management_health, run_top
+from .monitor import check_management_health
+from .tui import MQTopApp
 
 app = typer.Typer(help="MQTop – RabbitMQ top + Kubernetes port-forward helper.")
 
@@ -44,6 +45,35 @@ def _load_providers_or_exit() -> dict[str, ProviderConfig]:
             "Copy config.example.toml from the repository to ~/.mqtop/config.toml "
             "and adjust it to your environment."
         )
+        raise typer.Exit(code=1)
+
+
+def _run_textual_top(selected: ProviderConfig, refresh: float) -> None:
+    """Shared helper to run the Textual-based top for a provider."""
+    fs = ensure_forward_for_provider(selected)
+
+    if fs is not None:
+        typer.echo(
+            "Port-forward for K8s provider:\n"
+            f"  provider={fs.provider_name}\n"
+            f"  pid={fs.pid}\n"
+            f"  command={' '.join(fs.command)}\n"
+        )
+    else:
+        typer.echo("No K8s provider – using direct connection.\n")
+
+    # Perform a quick health-check so we fail fast on connection issues.
+    try:
+        check_management_health(selected)
+    except MQTopError as exc:
+        typer.echo(f"Error: {exc}")
+        raise typer.Exit(code=1)
+
+    app_ui = MQTopApp(provider=selected, refresh=refresh)
+    try:
+        app_ui.run()
+    except MQTopError as exc:
+        typer.echo(f"Error: {exc}")
         raise typer.Exit(code=1)
 
 
@@ -68,7 +98,7 @@ def top(
         help="Provider name from TOML config (section [providers.<name>]).",
     ),
 ) -> None:
-    """Basic `top` mode – live view of RabbitMQ queues."""
+    """Top mode – live view of RabbitMQ queues in a Textual TUI."""
     providers = _load_providers_or_exit()
     selected: ProviderConfig | None = providers.get(provider)
 
@@ -80,31 +110,8 @@ def top(
         )
         raise typer.Exit(code=1)
 
-    fs = ensure_forward_for_provider(selected)
-
-    if fs is not None:
-        typer.echo(
-            "Port-forward for K8s provider:\n"
-            f"  provider={fs.provider_name}\n"
-            f"  pid={fs.pid}\n"
-            f"  command={' '.join(fs.command)}\n"
-        )
-    else:
-        typer.echo("No K8s provider – using direct connection.\n")
-
-    # Perform a quick health-check so we fail fast on connection issues.
-    try:
-        check_management_health(selected)
-    except MQTopError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(code=1)
-
-    # Hand off to the Rich-based `top` implementation.
-    try:
-        run_top(selected, refresh=refresh, pattern=pattern)
-    except MQTopError as exc:
-        typer.echo(f"Error: {exc}")
-        raise typer.Exit(code=1)
+    # For now we ignore pattern and reuse the Textual-based top.
+    _run_textual_top(selected, refresh=refresh)
 
 
 @forward_app.command("start")
@@ -290,11 +297,21 @@ def main_callback(
         help="Refresh interval in seconds.",
     ),
 ) -> None:
-    """When called without subcommand, run `top` by default."""
+    """When called without subcommand, run Textual `top` by default."""
     if ctx.invoked_subcommand is not None:
         return
 
-    top(refresh=refresh, pattern=None, provider=provider)
+    providers = _load_providers_or_exit()
+    selected: ProviderConfig | None = providers.get(provider)
+    if selected is None:
+        available = ", ".join(sorted(providers.keys())) or "(none)"
+        typer.echo(
+            f"Provider '{provider}' not found in config. "
+            f"Available providers: {available}"
+        )
+        raise typer.Exit(code=1)
+
+    _run_textual_top(selected, refresh=refresh)
 
 
 def main() -> None:

@@ -17,6 +17,7 @@ dependencies = [
   "rich>=13.0.0",
   "requests>=2.31.0",
   "toml>=0.10.2",
+  "textual>=0.55.0",
 ]
 
 [project.optional-dependencies]
