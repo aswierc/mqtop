@@ -2,7 +2,9 @@
 
 MQTop is a lightweight Python CLI tool for developers and SREs working with RabbitMQ, especially in Kubernetes environments. It provides a `top`-like live view of queues and can automatically manage `kubectl port-forward` for RabbitMQ running inside a cluster.
 
-![MQTop TUI](doc/img.png)
+![MQTop TUI](doc/img_1.png)
+
+![MQTop TUI](doc/img_2.png)
 
 ## Installation (development)
 
@@ -50,7 +52,7 @@ password = "guest"
 mqtop
 ```
 
-The `top` table shows, among others:
+The `top` view is a Textual TUI. It shows, among others:
 - current queue depth (`ready`, `unacked`),
 - basic rates (`pub/s`, `del/s`),
 - per-session totals (`pubΔ`, `delΔ`) since MQTop was started.
@@ -81,13 +83,19 @@ mqtop k8s forward stop dev-k8s
 mqtop msg peek my_queue_name -P dev-k8s -n 5
 ```
 
+- Inside the TUI:
+  - `p` – open provider selector (choose profile and confirm with Enter),
+  - `q` – quit,
+  - status bar shows current profile and connection state (direct vs K8s port-forward, errors, etc.).
+
 ## Notes for learning Python
 
 The codebase is intentionally structured to be educational:
 
 - `src/mqtop/config.py` – typed configuration models and TOML handling.
 - `src/mqtop/k8s.py` – small adapter around `kubectl port-forward`.
-- `src/mqtop/monitor.py` – RabbitMQ Management API integration + Rich TUI.
+- `src/mqtop/monitor.py` – RabbitMQ Management API integration and queue metrics helpers.
+- `src/mqtop/tui.py` – Textual-based main TUI (profiles, status bar).
 - `src/mqtop/cli.py` – Typer-based CLI wiring everything together.
 
 Comments and structure should help you see how a typical modern Python CLI project is organised.
