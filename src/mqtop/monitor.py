@@ -23,6 +23,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .config import ProviderConfig
+from .errors import MQTopError
 
 
 @dataclass
@@ -114,6 +115,29 @@ def _fetch_queues(provider: ProviderConfig, pattern: Optional[str]) -> List[Queu
     return queues
 
 
+def check_management_health(provider: ProviderConfig) -> None:
+    """Perform a lightweight health-check against the Management API.
+
+    The goal is to fail fast with a clear message if:
+    - port-forward is not active,
+    - RabbitMQ Management is not reachable or returns an error.
+    """
+    base = _management_base_url(provider)
+    url = f"{base}/api/overview"
+
+    auth = None
+    if provider.username and provider.password:
+        auth = (provider.username, provider.password)
+
+    try:
+        resp = requests.get(url, auth=auth, timeout=3)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        raise MQTopError(
+            f"Cannot connect to RabbitMQ Management API at {base}: {exc}"
+        ) from exc
+
+
 _SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
 
@@ -201,7 +225,14 @@ def run_top(
 
         with Live(console=console, refresh_per_second=8) as live:
             while True:
-                queues = _fetch_queues(provider, pattern=None)
+                try:
+                    queues = _fetch_queues(provider, pattern=None)
+                except requests.RequestException as exc:
+                    # Convert low-level HTTP/connection errors to a user-facing exception.
+                    base = _management_base_url(provider)
+                    raise MQTopError(
+                        f"Failed to fetch queues from {base}: {exc}"
+                    ) from exc
                 for q in queues:
                     key = (q.vhost, q.name)
                     if key not in baselines:

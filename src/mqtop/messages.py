@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .config import ProviderConfig
+from .errors import MQTopError
 from .monitor import _management_base_url, _fetch_queues
 
 
@@ -63,14 +64,19 @@ def peek_messages(
         auth = (provider.username, provider.password)
 
     body = {
-      "count": count,
-      "ackmode": "ack_requeue_true",
-      "encoding": "auto",
-      "truncate": 5000,
+        "count": count,
+        "ackmode": "ack_requeue_true",
+        "encoding": "auto",
+        "truncate": 5000,
     }
 
-    resp = requests.post(url, json=body, auth=auth, timeout=5)
-    resp.raise_for_status()
+    try:
+        resp = requests.post(url, json=body, auth=auth, timeout=5)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        raise MQTopError(
+            f"Failed to peek messages from queue '{queue}' via {base}: {exc}"
+        ) from exc
     data = resp.json()
 
     messages: List[PeekedMessage] = []

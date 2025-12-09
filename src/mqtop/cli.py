@@ -16,6 +16,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .config import ProviderConfig, load_providers
+from .errors import MQTopError
 from .k8s import (
     ensure_forward_for_provider,
     forward_status,
@@ -23,7 +24,7 @@ from .k8s import (
     stop_forward,
 )
 from .messages import peek_messages, print_peeked_messages
-from .monitor import run_top
+from .monitor import check_management_health, run_top
 
 app = typer.Typer(help="MQTop – RabbitMQ top + Kubernetes port-forward helper.")
 
@@ -91,8 +92,19 @@ def top(
     else:
         typer.echo("No K8s provider – using direct connection.\n")
 
+    # Perform a quick health-check so we fail fast on connection issues.
+    try:
+        check_management_health(selected)
+    except MQTopError as exc:
+        typer.echo(f"Error: {exc}")
+        raise typer.Exit(code=1)
+
     # Hand off to the Rich-based `top` implementation.
-    run_top(selected, refresh=refresh, pattern=pattern)
+    try:
+        run_top(selected, refresh=refresh, pattern=pattern)
+    except MQTopError as exc:
+        typer.echo(f"Error: {exc}")
+        raise typer.Exit(code=1)
 
 
 @forward_app.command("start")
@@ -119,7 +131,7 @@ def k8s_forward_start(
         raise typer.Exit(code=0)
 
     typer.echo(
-        "Port-forward uruchomiony (lub już działał):\n"
+        "Port-forward started (or was already running):\n"
         f"  provider={fs.provider_name}\n"
         f"  pid={fs.pid}\n"
         f"  command={' '.join(fs.command)}"
@@ -251,7 +263,11 @@ def msg_peek(
         )
         raise typer.Exit(code=1)
 
-    msgs = peek_messages(selected, queue=queue, count=count)
+    try:
+        msgs = peek_messages(selected, queue=queue, count=count)
+    except MQTopError as exc:
+        typer.echo(f"Error: {exc}")
+        raise typer.Exit(code=1)
     print_peeked_messages(msgs)
 
 

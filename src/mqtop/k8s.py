@@ -122,6 +122,36 @@ def _is_pid_running(pid: int) -> bool:
     return True
 
 
+def _clean_forward_state_if_stale() -> None:
+    """Clean up any stored port-forward state whose PID is no longer running.
+
+    This is especially useful after a machine reboot where the JSON file
+    still exists but the old PIDs are no longer valid.
+    """
+    if not FORWARD_STATE_PATH.exists():
+        return
+
+    state = _load_forward_state()
+    changed = False
+
+    for name, fs in list(state.items()):
+        if not _is_pid_running(fs.pid):
+            state.pop(name, None)
+            changed = True
+
+    if not changed:
+        return
+
+    if state:
+        _save_forward_state(state)
+    else:
+        # Remove the file entirely if we have no active forwards left.
+        try:
+            FORWARD_STATE_PATH.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def start_forward(provider: ProviderConfig) -> ForwardState | None:
     """Start `kubectl port-forward` for a K8s provider if needed.
 
@@ -132,6 +162,7 @@ def start_forward(provider: ProviderConfig) -> ForwardState | None:
     if provider.type != "k8s":
         return None
 
+    _clean_forward_state_if_stale()
     state = _load_forward_state()
     existing = state.get(provider.name)
 
@@ -161,6 +192,7 @@ def stop_forward(provider: ProviderConfig) -> bool:
     """Stop port-forward for a given provider, if it is running.
 
     Returns True if we actually stopped something."""
+    _clean_forward_state_if_stale()
     state = _load_forward_state()
     fs = state.get(provider.name)
     if not fs:
@@ -185,6 +217,7 @@ def stop_forward(provider: ProviderConfig) -> bool:
 
 def forward_status(provider: ProviderConfig) -> ForwardState | None:
     """Return port-forward state for a provider, if it is running."""
+    _clean_forward_state_if_stale()
     state = _load_forward_state()
     fs = state.get(provider.name)
     if not fs:
@@ -205,4 +238,5 @@ def ensure_forward_for_provider(provider: ProviderConfig) -> ForwardState | None
     For `k8s` providers ensures forward is running,
     for `direct` simply returns None.
     """
+    _clean_forward_state_if_stale()
     return start_forward(provider)
